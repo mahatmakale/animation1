@@ -13,9 +13,11 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
-            /* Taller scroll area to comfortably fit all 3 phases (Dissolve -> Text -> Burn) */
-            height: 700vh; /* Fallback */
-            height: calc(var(--vh, 1vh) * 700); /* Real viewport height */
+            /* EXPANDED: 1400vh total. 
+               0-700vh = WebGL Reveal
+               700-1400vh = 3D Gallery Journey */
+            height: 1400vh; /* Fallback */
+            height: calc(var(--vh, 1vh) * 1400); /* Real viewport height */
             background-color: #000;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             overflow-x: hidden;
@@ -73,9 +75,7 @@
             100% { opacity: 0; transform: translate(-50%, 15px); }
         }
 
-        /* =========================================
-           NEW: CINEMATIC WEDDING TEXT LAYER
-           ========================================= */
+        /* CINEMATIC WEDDING TEXT LAYER */
         .wedding-text-layer {
             position: fixed;
             top: 0; left: 0; width: 100vw; 
@@ -86,10 +86,8 @@
             justify-content: center; align-items: center;
             pointer-events: none; color: #fff;
             text-shadow: 0 4px 25px rgba(0,0,0,0.8), 0 2px 10px rgba(0,0,0,0.5);
-            
-            /* Performance optimization for scroll animations */
             will-change: transform, opacity;
-            opacity: 0; /* Hidden by default, JS controls this */
+            opacity: 0;
         }
 
         .wedding-text-layer .names {
@@ -103,7 +101,7 @@
         .wedding-text-layer .names .heart {
             font-family: sans-serif;
             font-size: 0.5em; margin: 0 10px;
-            color: #ffccd5; /* Soft cinematic glow color */
+            color: #ffccd5;
             display: inline-block;
             filter: drop-shadow(0 0 10px rgba(255, 180, 200, 0.6));
         }
@@ -126,9 +124,97 @@
 
         #loading {
             position: fixed; inset: 0; background: #050505; color: white;
-            z-index: 10; display: flex; justify-content: center; align-items: center;
+            z-index: 20; display: flex; justify-content: center; align-items: center;
             font-size: 1.2rem; letter-spacing: 0.1em; transition: opacity 1s ease-out;
         }
+
+        /* =========================================
+           NEW: 3D FLOATING GALLERY CSS
+           ========================================= */
+        .gallery-viewport {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; 
+            height: calc(var(--vh, 1vh) * 100);
+            z-index: 6; /* Above the cinematic text */
+            perspective: 1200px; /* Creates the 3D depth field */
+            overflow: hidden;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 1s ease-out;
+            /* Background starts transparent and fades to black via JS */
+        }
+
+        .gallery-world {
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 100vw; height: 100vh;
+            transform-style: preserve-3d;
+            will-change: transform;
+            /* Starting position updated by JS */
+            transform: translate3d(-50%, -50%, 0);
+        }
+
+        .memory-card {
+            position: absolute;
+            transform-style: preserve-3d;
+            cursor: pointer;
+            border-radius: 6px;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.6), 0 0 20px rgba(255,255,255,0.05);
+            /* hardware acceleration */
+            will-change: transform, opacity;
+            transition: box-shadow 0.3s ease;
+        }
+
+        .memory-card:hover {
+            box-shadow: 0 25px 60px rgba(0,0,0,0.8), 0 0 30px rgba(255,255,255,0.15);
+        }
+
+        .memory-card img {
+            width: 100%; height: 100%;
+            object-fit: cover;
+            border-radius: inherit;
+            display: block;
+            pointer-events: none; /* Let the container handle clicks */
+        }
+
+        /* FULLSCREEN LIGHTBOX */
+        .lightbox {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(5, 5, 8, 0.95);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            z-index: 15;
+            display: flex; justify-content: center; align-items: center;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.5s ease;
+            cursor: zoom-out;
+        }
+
+        .lightbox.active {
+            opacity: 1; pointer-events: auto;
+        }
+
+        .lightbox img {
+            max-width: 90vw; max-height: 85vh;
+            border-radius: 8px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+            transform: scale(0.9);
+            transition: transform 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+        }
+
+        .lightbox.active img {
+            transform: scale(1);
+        }
+
+        .lightbox-close {
+            position: absolute; top: 30px; right: 30px;
+            color: #fff; font-size: 2rem; font-family: sans-serif;
+            opacity: 0.6; transition: opacity 0.3s;
+        }
+        
+        .lightbox:hover .lightbox-close { opacity: 1; }
+
     </style>
 </head>
 <body>
@@ -144,30 +230,40 @@
         </div>
     </div>
 
-    <!-- NEW: HTML FOR CINEMATIC TEXT -->
+    <!-- HTML FOR CINEMATIC TEXT -->
     <div class="wedding-text-layer" id="wedding-text">
         <div class="save-the-date">Save the Date</div>
         <div class="names">Prabhu <span class="heart">❤️</span> Vidhya</div>
         <div class="date">15 &bull; 05 &bull; 2026</div>
     </div>
 
+    <!-- NEW: 3D FLOATING GALLERY -->
+    <div class="gallery-viewport" id="gallery-viewport">
+        <div class="gallery-world" id="gallery-world">
+            <!-- Images will be injected here via JS -->
+        </div>
+    </div>
+
+    <!-- NEW: LIGHTBOX FOR TAP-TO-EXPAND -->
+    <div class="lightbox" id="lightbox">
+        <div class="lightbox-close">&times;</div>
+        <img src="" id="lightbox-img" alt="Enlarged Memory">
+    </div>
+
     <script>
         // =========================================================
         // VIEWPORT HEIGHT FIX FOR MOBILE
-        // Ensures the canvas and layers cover the exact viewport instantly
         // =========================================================
         function setViewportHeight() {
             let vh = window.innerHeight * 0.01;
             document.documentElement.style.setProperty('--vh', `${vh}px`);
         }
-        
-        // Execute immediately before anything else
         setViewportHeight();
         window.addEventListener('resize', setViewportHeight);
         window.addEventListener('orientationchange', setViewportHeight);
 
         // =========================================================
-        // OPTIMIZATION 5: Detect Mobile for Low Power Mode
+        // WebGL SHADER CODE & SETUP
         // =========================================================
         const isMobile = window.innerWidth < 768 || /Mobi|Android/i.test(navigator.userAgent);
 
@@ -182,7 +278,6 @@
         `;
 
         const fragmentShaderSource = `
-            // OPTIMIZATION 8: Use mediump instead of highp for much faster mobile processing
             precision mediump float;
 
             varying vec2 vUv;
@@ -193,7 +288,7 @@
             
             uniform float u_progress;
             uniform float u_time;
-            uniform float u_isMobile; // NEW: Mobile toggle for shader
+            uniform float u_isMobile;
             
             uniform vec2 u_frontAspect;
             uniform vec2 u_backAspect;
@@ -217,21 +312,16 @@
                 return 130.0 * dot(m, g);
             }
 
-            // OPTIMIZATION 2: Unrolled FBM Loop. Skips 3rd heavy calculation on mobile
             float fbm(vec2 st) {
                 float value = 0.0; float amplitude = 0.5;
                 value += amplitude * snoise(st); st *= 2.0; amplitude *= 0.5;
                 value += amplitude * snoise(st); st *= 2.0; amplitude *= 0.5;
-                if (u_isMobile < 0.5) {
-                    value += amplitude * snoise(st);
-                }
+                if (u_isMobile < 0.5) { value += amplitude * snoise(st); }
                 return value;
             }
 
             void main() {
                 vec2 uv = vUv;
-                
-                // OPTIMIZATION 4: Slower time updates on mobile
                 float t = u_time * (u_isMobile > 0.5 ? 0.6 : 1.0);
 
                 float phase1 = clamp(u_progress * 2.0, 0.0, 1.0); 
@@ -245,49 +335,32 @@
                 float bgZoom = 1.3 - (0.3 * phase1); 
                 backUV = (backUV - 0.5) * bgZoom + 0.5;
 
-                // Set baseline values
-                float alphaFront = 0.0;
-                float mappedProgress1 = phase1 * 1.5 - 0.25;
-                float n1 = 0.0;
-                float alphaBack = 1.0;
-                float burnBandMask = 0.0;
+                float alphaFront = 0.0; float mappedProgress1 = phase1 * 1.5 - 0.25;
+                float n1 = 0.0; float alphaBack = 1.0; float burnBandMask = 0.0;
 
-                // =========================================================
-                // OPTIMIZATION 3: CONDITIONAL PHASE CALCULATION
-                // Only run heavy Phase 1 noise if the image is actually dissolving
-                // =========================================================
                 if (phase1 < 1.0) {
                     vec2 noiseUV1 = uv * 3.0 + vec2(t * 0.05, t * 0.08);
                     n1 = fbm(noiseUV1) * 0.5 + 0.5; 
                     alphaFront = smoothstep(mappedProgress1, mappedProgress1 + 0.15, n1);
 
                     float distToEdge1 = abs(n1 - mappedProgress1);
-                    
-                    // Limit heavy distortion ONLY to the edge boundary
                     if (distToEdge1 < 0.2) {
                         float distStrength1 = smoothstep(0.2, 0.0, distToEdge1) * 0.04;
                         frontUV += vec2(snoise(uv * 15.0 + t * 0.8), snoise(uv * 15.0 - t * 0.6)) * distStrength1;
                     }
                 }
 
-                // =========================================================
-                // OPTIMIZATION 3: CONDITIONAL PHASE CALCULATION
-                // Only run heavy Phase 2 noise if burn has started
-                // =========================================================
                 if (phase2 > 0.0) {
                     float distFromBottom = 1.0 - uv.y;
                     vec2 noiseUV2 = uv * vec2(2.5, 4.0) + vec2(snoise(uv * 2.0 + t * 0.1), -t * 0.15);
                     float n2 = fbm(noiseUV2) * 0.5 + 0.5; 
-                    
                     float mappedProgress2 = phase2 * 1.5 - 0.25; 
                     float burnBoundary = distFromBottom + n2 * 0.4;
                     alphaBack = smoothstep(mappedProgress2, mappedProgress2 + 0.25, burnBoundary);
-                    
                     burnBandMask = smoothstep(0.0, 0.2, alphaBack) * (1.0 - smoothstep(0.8, 1.0, alphaBack));
                     
-                    // Limit heavy distortion ONLY to the inside of the burning band
                     if (burnBandMask > 0.01) {
-                        float distStr = u_isMobile > 0.5 ? 0.04 : 0.06; // Lower distortion on mobile
+                        float distStr = u_isMobile > 0.5 ? 0.04 : 0.06;
                         vec2 disp2 = vec2(snoise(uv * 25.0 + t * 1.5), snoise(uv * 25.0 - t * 1.2)) * distStr * burnBandMask;
                         backUV += disp2;
                     }
@@ -301,7 +374,6 @@
                 vec3 finalBackColor = mix(vec3(luminance), colorBack.rgb, phase1);
                 float brightness = mix(0.4, 1.0, phase1);
                 
-                // OPTIMIZATION: Only calculate flicker where it actually matters
                 if (burnBandMask > 0.0) {
                     float flicker = snoise(uv * 50.0 + t * 5.0) * 0.2 * burnBandMask;
                     finalBackColor = finalBackColor * brightness + flicker;
@@ -324,8 +396,9 @@
         const canvas = document.getElementById('webgl-canvas');
         const gl = canvas.getContext('webgl', { antialias: false, alpha: false });
         
-        let scrollTarget = 0;
-        let scrollCurrent = 0;
+        let scrollTarget = 0; let scrollCurrent = 0;
+        let galleryScrollTarget = 0; let galleryScrollCurrent = 0;
+        
         const state = {
             frontAspect: [1, 1], backAspect: [1, 1], thirdAspect: [1, 1],
             startTime: performance.now(), imagesLoaded: 0, textures: {}
@@ -358,7 +431,7 @@
             u_frontAspect: gl.getUniformLocation(program, "u_frontAspect"),
             u_backAspect: gl.getUniformLocation(program, "u_backAspect"),
             u_thirdAspect: gl.getUniformLocation(program, "u_thirdAspect"),
-            u_isMobile: gl.getUniformLocation(program, "u_isMobile"), // NEW
+            u_isMobile: gl.getUniformLocation(program, "u_isMobile"),
         };
 
         function loadTexture(url, uniformName, unit) {
@@ -380,40 +453,31 @@
             img.src = url;
         }
 
+        // Load 3 main Reveal images
         loadTexture('https://images.unsplash.com/photo-1511285560929-80b456fea0bc?q=70&w=1080&auto=format&fit=crop', 'u_imageFront', 0);
         loadTexture('https://images.unsplash.com/photo-1583939003579-730e3918a45a?q=70&w=1080&auto=format&fit=crop', 'u_imageBack', 1);
         loadTexture('https://images.unsplash.com/photo-1600093463592-8e36ae95ef56?q=70&w=1080&auto=format&fit=crop', 'u_imageThird', 2);
 
         function calculateAspectRatios() {
             const canvasRatio = canvas.width / canvas.height;
-            
             ['u_imageFront', 'u_imageBack', 'u_imageThird'].forEach(name => {
                 const img = state.textures[name].img;
                 const imgRatio = img.width / img.height;
                 let scaleX = 1.0; let scaleY = 1.0;
-                
                 if (canvasRatio > imgRatio) { scaleY = imgRatio / canvasRatio; } 
                 else { scaleX = canvasRatio / imgRatio; }
-
                 if (name === 'u_imageFront') state.frontAspect = [scaleX, scaleY];
                 if (name === 'u_imageBack') state.backAspect = [scaleX, scaleY];
                 if (name === 'u_imageThird') state.thirdAspect = [scaleX, scaleY];
             });
-
             gl.uniform2f(uniforms.u_frontAspect, state.frontAspect[0], state.frontAspect[1]);
             gl.uniform2f(uniforms.u_backAspect, state.backAspect[0], state.backAspect[1]);
             gl.uniform2f(uniforms.u_thirdAspect, state.thirdAspect[0], state.thirdAspect[1]);
         }
 
         function resize() {
-            // =========================================================
-            // OPTIMIZATION 1: REDUCE PIXEL LOAD
-            // Drastically lower the internal rendering resolution on mobile
-            // CSS handles scaling it back up to look sharp
-            // =========================================================
             const baseDpr = window.devicePixelRatio || 1;
             const dpr = isMobile ? Math.min(baseDpr, 0.75) : Math.min(baseDpr, 1.5);
-            
             canvas.width = window.innerWidth * dpr; 
             canvas.height = window.innerHeight * dpr;
             canvas.style.width = window.innerWidth + 'px'; 
@@ -423,60 +487,201 @@
         }
         window.addEventListener('resize', resize);
 
+
+        // =========================================================
+        // NEW: 3D GALLERY LOGIC
+        // =========================================================
+        const galleryWorld = document.getElementById('gallery-world');
+        const galleryViewport = document.getElementById('gallery-viewport');
+        const lightbox = document.getElementById('lightbox');
+        const lightboxImg = document.getElementById('lightbox-img');
+        
+        let mouseXTarget = 0, mouseYTarget = 0;
+        let mouseXCurrent = 0, mouseYCurrent = 0;
+        let cardsData = [];
+
+        // 25 Cinematic/Wedding memory images
+        const galleryImages = [
+            "https://images.unsplash.com/photo-1519741497674-611481863552?q=70&w=800&auto=format&fit=crop",
+            "https://images.unsplash.com/photo-1520854221256-17451cc331bf?q=70&w=800&auto=format&fit=crop",
+            "https://images.unsplash.com/photo-1511895426328-dc8714191300?q=70&w=800&auto=format&fit=crop",
+            "https://images.unsplash.com/photo-1469334031218-e382a71b716b?q=70&w=800&auto=format&fit=crop",
+            "https://images.unsplash.com/photo-1532712938310-34cb3982ef74?q=70&w=800&auto=format&fit=crop",
+            "https://images.unsplash.com/photo-1465495976277-4387d4b0b4c6?q=70&w=800&auto=format&fit=crop",
+            "https://images.unsplash.com/photo-1606800052052-a08af7148866?q=70&w=800&auto=format&fit=crop",
+            "https://images.unsplash.com/photo-1529636798458-92182e662485?q=70&w=800&auto=format&fit=crop",
+            "https://images.unsplash.com/photo-1522673607200-164d1b6ce486?q=70&w=800&auto=format&fit=crop",
+            "https://images.unsplash.com/photo-1515934751635-c81c6bc9a2d8?q=70&w=800&auto=format&fit=crop",
+            "https://images.unsplash.com/photo-1544078754-0a3cb127d49e?q=70&w=800&auto=format&fit=crop",
+            "https://images.unsplash.com/photo-1530103043960-ef38714abb15?q=70&w=800&auto=format&fit=crop",
+            "https://images.unsplash.com/photo-1507504031003-b417219a0fde?q=70&w=800&auto=format&fit=crop",
+            "https://images.unsplash.com/photo-1478146896981-b80fe463b330?q=70&w=800&auto=format&fit=crop",
+            "https://images.unsplash.com/photo-1583939003579-730e3918a45a?q=70&w=800&auto=format&fit=crop",
+            "https://images.unsplash.com/photo-1600093463592-8e36ae95ef56?q=70&w=800&auto=format&fit=crop",
+            "https://images.unsplash.com/photo-1523438885200-e635ba2c371e?q=70&w=800&auto=format&fit=crop",
+            "https://images.unsplash.com/photo-1546198547-418706325514?q=70&w=800&auto=format&fit=crop",
+            "https://images.unsplash.com/photo-1510076857177-7470076d4098?q=70&w=800&auto=format&fit=crop",
+            "https://images.unsplash.com/photo-1509927083803-4bd519298ac4?q=70&w=800&auto=format&fit=crop",
+            "https://images.unsplash.com/photo-1494589255776-6466f365dce7?q=70&w=800&auto=format&fit=crop",
+            "https://images.unsplash.com/photo-1550005809-91ad75fb315f?q=70&w=800&auto=format&fit=crop"
+        ];
+
+        function initGallery() {
+            galleryImages.forEach((src, i) => {
+                const el = document.createElement('div');
+                el.className = 'memory-card';
+                
+                const img = document.createElement('img');
+                img.src = src;
+                el.appendChild(img);
+                galleryWorld.appendChild(el);
+
+                // Organic positioning math
+                // Push items away from exact center to avoid blocking the "camera path" completely
+                let rx = (Math.random() - 0.5) * window.innerWidth * 2.5;
+                if (Math.abs(rx) < 150) rx = rx > 0 ? rx + 200 : rx - 200;
+                
+                let ry = (Math.random() - 0.5) * window.innerHeight * 2.5;
+                if (Math.abs(ry) < 150) ry = ry > 0 ? ry + 200 : ry - 200;
+                
+                // Distribute heavily backwards in Z space (Depth)
+                let rz = -(Math.random() * 18000) - 500; 
+                
+                // Varying sizes
+                let size = isMobile ? (Math.random() * 120 + 100) : (Math.random() * 250 + 150);
+                
+                // Slight organic rotation
+                let rot = (Math.random() - 0.5) * 12;
+
+                el.style.width = `${size}px`;
+                el.style.height = `${size * 1.3}px`; // Portrait ratio
+                el.style.transform = `translate3d(calc(-50% + ${rx}px), calc(-50% + ${ry}px), ${rz}px) rotate(${rot}deg)`;
+                
+                cardsData.push({ el, x: rx, y: ry, z: rz, rot: rot, lastOpacity: -1 });
+
+                // Tap Interaction
+                el.addEventListener('click', () => {
+                    lightboxImg.src = src;
+                    lightbox.classList.add('active');
+                });
+            });
+
+            // Close Lightbox
+            lightbox.addEventListener('click', () => lightbox.classList.remove('active'));
+        }
+
+        // Mouse/Touch Interaction (Parallax Repel Effect)
+        function updateMouseTarget(x, y) {
+            // Map screen coords to -1.0 to 1.0, then scale for subtle camera movement
+            mouseXTarget = ((x / window.innerWidth) - 0.5) * 400;
+            mouseYTarget = ((y / window.innerHeight) - 0.5) * 400;
+        }
+        window.addEventListener('mousemove', (e) => updateMouseTarget(e.clientX, e.clientY));
+        window.addEventListener('touchmove', (e) => updateMouseTarget(e.touches[0].clientX, e.touches[0].clientY), {passive: true});
+
+        // =========================================================
+        // COMBINED SCROLL LOGIC
+        // =========================================================
         function updateScroll() {
-            const maxScroll = document.body.scrollHeight - window.innerHeight;
-            scrollTarget = Math.max(0, Math.min(1, window.scrollY / maxScroll));
+            const revealEnd = window.innerHeight * 7;
+            const scrollY = window.scrollY;
+
+            // Phase 1: WebGL (Locks at 1.0 when finished)
+            scrollTarget = Math.max(0, Math.min(1, scrollY / revealEnd));
             document.getElementById('ui-layer').style.opacity = scrollTarget > 0.05 ? 0 : 1;
+
+            // Phase 2: Gallery Journey (Starts after revealEnd)
+            galleryScrollTarget = Math.max(0, Math.min(1, (scrollY - revealEnd) / revealEnd));
+            
+            // Show/Hide Gallery viewport seamlessly over the final WebGL image
+            if (scrollY > revealEnd - (window.innerHeight * 0.5)) {
+                galleryViewport.style.opacity = 1;
+                galleryViewport.style.pointerEvents = "auto";
+            } else {
+                galleryViewport.style.opacity = 0;
+                galleryViewport.style.pointerEvents = "none";
+            }
         }
         window.addEventListener('scroll', updateScroll, { passive: true });
 
         function lerp(start, end, amt) { return (1 - amt) * start + amt * end; }
 
         function render() {
-            const isScrolling = Math.abs(scrollCurrent - scrollTarget) > 0.001;
+            // Interpolate scrolls for buttery smoothness
             scrollCurrent = lerp(scrollCurrent, scrollTarget, 0.08); 
+            galleryScrollCurrent = lerp(galleryScrollCurrent, galleryScrollTarget, 0.06);
             
-            // =========================================================
-            // OPTIMIZATION 6: CONDITIONAL RENDERING
-            // If scroll is perfectly idle inside the Text Phase (no active fire/water), 
-            // completely halt WebGL drawing
-            // =========================================================
+            // --- RENDER WEbGL (Only if active to save battery) ---
             const isIdlePhase = scrollCurrent >= 0.5 && scrollCurrent <= 0.8;
-            
-            if (isScrolling || !isIdlePhase) {
+            if (Math.abs(scrollCurrent - scrollTarget) > 0.001 || !isIdlePhase) {
                 gl.uniform1f(uniforms.u_progress, scrollCurrent);
                 gl.uniform1f(uniforms.u_time, (performance.now() - state.startTime) * 0.001);
                 gl.uniform1f(uniforms.u_isMobile, isMobile ? 1.0 : 0.0);
                 gl.drawArrays(gl.TRIANGLES, 0, 6);
             }
 
+            // --- RENDER TEXT LAYER ---
             const textLayer = document.getElementById('wedding-text');
             let tY = -30, tOp = 0, tScale = 1;
-
             if (scrollCurrent < 0.5) {
                 tY = -30; tOp = 0;
             } else if (scrollCurrent >= 0.5 && scrollCurrent < 0.65) {
-                let t = (scrollCurrent - 0.5) / 0.15;
-                t = t * (2 - t); 
-                tY = -30 * (1 - t); 
-                tOp = t;
+                let t = (scrollCurrent - 0.5) / 0.15; t = t * (2 - t); 
+                tY = -30 * (1 - t); tOp = t;
             } else if (scrollCurrent >= 0.65 && scrollCurrent < 0.75) {
                 tY = 0; tOp = 1;
             } else if (scrollCurrent >= 0.75 && scrollCurrent < 0.85) {
                 let t = (scrollCurrent - 0.75) / 0.10;
                 tY = 0; tOp = 1 - t; tScale = 1 - (0.2 * t); 
-            } else {
-                tOp = 0; tScale = 0.8;
-            }
-
+            } else { tOp = 0; tScale = 0.8; }
             textLayer.style.transform = `translateY(${tY}vh) scale(${tScale})`;
             textLayer.style.opacity = tOp;
+
+            // --- RENDER 3D GALLERY (Phase 2) ---
+            if (galleryScrollCurrent > 0.001) {
+                // Fade background smoothly to black to hide WebGL behind it
+                galleryViewport.style.background = `rgba(5, 5, 8, ${galleryScrollCurrent * 1.5})`;
+
+                // Lerp mouse follow
+                mouseXCurrent = lerp(mouseXCurrent, mouseXTarget, 0.05);
+                mouseYCurrent = lerp(mouseYCurrent, mouseYTarget, 0.05);
+
+                // Move camera deeply through the Z-axis
+                const worldZ = galleryScrollCurrent * 20000; 
+                
+                // Shift world in opposite direction of mouse to simulate parallax
+                galleryWorld.style.transform = `translate3d(calc(-50% + ${-mouseXCurrent}px), calc(-50% + ${-mouseYCurrent}px), ${worldZ}px)`;
+
+                // Manage fading as images pass by or appear in the distance
+                cardsData.forEach(card => {
+                    let relativeZ = card.z + worldZ;
+                    let opacity = 1;
+                    
+                    if (relativeZ > 300) {
+                        opacity = 0; // Passed behind the camera
+                    } else if (relativeZ > -400) {
+                        opacity = (relativeZ + 400) / 700; // Fading out as it gets too close
+                    } else if (relativeZ < -10000) {
+                        opacity = 1 - (-10000 - relativeZ) / 4000; // Fading in from dark void
+                    }
+
+                    opacity = Math.max(0, Math.min(1, opacity));
+                    
+                    // Only write to DOM if needed to keep 60fps
+                    if (Math.abs(card.lastOpacity - opacity) > 0.01) {
+                        card.el.style.opacity = opacity;
+                        card.el.style.pointerEvents = opacity > 0.1 ? 'auto' : 'none';
+                        card.lastOpacity = opacity;
+                    }
+                });
+            }
 
             requestAnimationFrame(render);
         }
 
         function initApp() {
-            resize(); // Called immediately to force correct calculation based on innerHeight
+            resize(); 
+            initGallery(); // Build the 3D gallery
             const loader = document.getElementById('loading');
             loader.style.opacity = 0; setTimeout(() => loader.remove(), 1000);
             updateScroll(); requestAnimationFrame(render);
